@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dino Card Arena</title>
+<style>
+*{box-sizing:border-box} body{margin:0;background:#151515;color:#fff;font-family:Arial,sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:18px}
+h1{text-align:center;margin:4px 0 14px}
+.top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#242424;padding:12px;border-radius:14px}
+button{border:0;border-radius:10px;padding:10px 14px;background:#e6a62b;font-weight:bold;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+.arena{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.player{background:#202020;border:2px solid #444;border-radius:16px;padding:14px;min-height:260px}
+.enemy{border-color:#8b3a32}.you{border-color:#376e9d}
+.stats{display:flex;justify-content:space-between;margin-bottom:10px}
+.board{min-height:150px;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap}
+.card{width:150px;background:linear-gradient(145deg,#f1e5bf,#b99a5c);color:#171717;border:4px solid #3d2d18;border-radius:12px;padding:8px;box-shadow:0 5px 12px #0008;cursor:pointer;user-select:none}
+.card h3{font-size:15px;margin:3px 0;text-align:center}.dino{height:72px;display:flex;align-items:center;justify-content:center;font-size:50px;background:#252525;border-radius:8px;margin-bottom:6px}
+.card small{display:block}.nums{display:flex;justify-content:space-between;font-weight:bold;margin-top:6px}
+.hand{display:flex;gap:10px;overflow-x:auto;padding:12px 2px}.hand .card{flex:0 0 150px}
+.selected{outline:4px solid #fff;transform:translateY(-5px)}
+.log{background:#0e0e0e;border-radius:12px;padding:10px;height:120px;overflow:auto;margin-top:16px;font-size:14px}
+.help{opacity:.8;text-align:center;font-size:13px;margin-top:10px}
+@media(max-width:700px){.arena{grid-template-columns:1fr}.card{width:135px}.hand .card{flex-basis:135px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🦖 Dino Card Arena</h1>
+<div class="top">
+  <div>เทิร์น: <b id="turn">1</b> | พลังผู้เล่น: <b id="hp">30</b> | พลังคู่ต่อสู้: <b id="ehp">30</b></div>
+  <div><button onclick="endTurn()">จบเทิร์น</button> <button onclick="resetGame()">เริ่มใหม่</button></div>
+</div>
+
+<div class="arena">
+<section class="player enemy">
+  <div class="stats"><b>🦖 คู่ต่อสู้</b><span>การ์ดบนสนาม</span></div>
+  <div id="enemyBoard" class="board"></div>
+</section>
+<section class="player you">
+  <div class="stats"><b>🎮 คุณ</b><span>เลือกการ์ดเพื่อโจมตี</span></div>
+  <div id="myBoard" class="board"></div>
+</section>
+</div>
+
+<h3>🃏 การ์ดในมือ</h3>
+<div id="hand" class="hand"></div>
+<div id="log" class="log"></div>
+<div class="help">กดการ์ดในมือเพื่อวางลงสนาม • กดการ์ดของคุณบนสนามเพื่อเลือก • จากนั้นกดการ์ดศัตรูเพื่อโจมตี</div>
+</div>
+
+<script>
+const cards=[
+ {name:"Rexon",icon:"🦖",atk:8,hp:12,cost:2,skill:"พลังดุดัน"},
+ {name:"Tricera",icon:"🦏",atk:6,hp:16,cost:2,skill:"เกราะหนา"},
+ {name:"Raptor",icon:"🦎",atk:10,hp:8,cost:3,skill:"โจมตีเร็ว"},
+ {name:"Stego",icon:"🦕",atk:5,hp:20,cost:3,skill:"กระดูกแข็ง"},
+ {name:"Spino",icon:"🐊",atk:12,hp:10,cost:4,skill:"นักล่า"},
+ {name:"Ankylo",icon:"🦴",atk:7,hp:18,cost:3,skill:"หางเหล็ก"}
+];
+
+let state;
+function newCard(){return {...cards[Math.floor(Math.random()*cards.length)]};}
+function resetGame(){
+ state={turn:1,hp:30,ehp:30,mana:5,selected:null,hand:[],my:[],enemy:[],over:false};
+ for(let i=0;i<5;i++)state.hand.push(newCard());
+ state.enemy.push(newCard());
+ log("เริ่มเกม! เลือกการ์ดจากมือเพื่อวางลงสนาม");
+ render();
+}
+function log(t){const e=document.getElementById("log");e.innerHTML="<div>• "+t+"</div>"+e.innerHTML;}
+function cardHTML(c,owner,index){
+ return `<div class="card ${state.selected===index&&owner==="my"?"selected":""}" onclick="${owner==='hand'?`playCard(${index})`:owner==='my'?`selectCard(${index})`:`attack(${index})`}">
+ <div class="dino">${c.icon}</div><h3>${c.name}</h3><small>สกิล: ${c.skill}</small>
+ <div class="nums"><span>⚔️ ${c.atk}</span><span>❤️ ${c.hp}</span></div></div>`;
+}
+function render(){
+ document.getElementById("turn").textContent=state.turn;
+ document.getElementById("hp").textContent=state.hp;
+ document.getElementById("ehp").textContent=state.ehp;
+ document.getElementById("hand").innerHTML=state.hand.map((c,i)=>cardHTML(c,"hand",i)).join("");
+ document.getElementById("myBoard").innerHTML=state.my.length?state.my.map((c,i)=>cardHTML(c,"my",i)).join(""):"<span>สนามว่าง</span>";
+ document.getElementById("enemyBoard").innerHTML=state.enemy.length?state.enemy.map((c,i)=>cardHTML(c,"enemy",i)).join(""):"<span>สนามว่าง</span>";
+}
+function playCard(i){
+ if(state.over)return;
+ if(state.my.length>=3){log("สนามเต็มแล้ว");return;}
+ const c=state.hand[i];
+ if(c.cost>state.mana){log("พลังไม่พอ");return;}
+ state.mana-=c.cost; state.my.push(c); state.hand.splice(i,1);
+ log(`คุณวาง ${c.name} ลงสนาม`);
+ render();
+}
+function selectCard(i){
+ state.selected=i; log(`เลือก ${state.my[i].name} แล้ว เลือกการ์ดศัตรูเพื่อโจมตี`); render();
+}
+function attack(i){
+ if(state.selected===null){log("เลือกไดโนเสาร์ของคุณก่อน");return;}
+ const a=state.my[state.selected], d=state.enemy[i];
+ d.hp-=a.atk; a.hp-=d.atk;
+ log(`${a.name} โจมตี ${d.name}!`);
+ if(d.hp<=0){log(`${d.name} ถูกกำจัด`);state.enemy.splice(i,1);}
+ if(a.hp<=0){log(`${a.name} ถูกกำจัด`);state.my.splice(state.selected,1);}
+ state.selected=null;
+ if(state.enemy.length===0){state.ehp=0;state.over=true;log("🏆 คุณชนะ!");}
+ render();
+}
+function endTurn(){
+ if(state.over)return;
+ state.turn++; state.mana=Math.min(7,state.mana+2);
+ if(state.enemy.length<3 && Math.random()<.7)state.enemy.push(newCard());
+ if(state.enemy.length){
+   const d=state.enemy[Math.floor(Math.random()*state.enemy.length)];
+   if(state.my.length){
+     const a=state.my[Math.floor(Math.random()*state.my.length)];
+     a.hp-=d.atk; log(`${d.name} โจมตี ${a.name}`);
+     if(a.hp<=0){log(`${a.name} ถูกกำจัด`);state.my=state.my.filter(x=>x!==a);}
+   }else{state.hp-=d.atk;log(`${d.name} โจมตีผู้เล่นโดยตรง!`);}
+ }
+ if(state.hp<=0){state.hp=0;state.over=true;log("💀 คุณแพ้");}
+ state.hand.push(newCard());
+ if(state.hand.length>8)state.hand.shift();
+ render();
+}
+resetGame();
+</script>
+</body>
+</html>
